@@ -17,7 +17,7 @@ RUN mkdir -p /api /etc/kea /etc/nftables
 
 COPY kea/kea-dhcp4.conf.template /kea-dhcp4.conf.template
 COPY nftables/ruleset.nft /etc/nftables/ruleset.nft
-COPY api/app.py /api/app.py
+COPY api/ /api/
 COPY docker/gateway/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
