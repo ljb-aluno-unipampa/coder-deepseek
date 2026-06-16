@@ -1,5 +1,4 @@
 FROM ubuntu:24.04
-
 ENV DEBIAN_FRONTEND=noninteractive
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -16,11 +15,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 RUN mkdir -p /api /etc/kea /etc/nftables
 
-# Copia template do Kea (contexto = raiz do projeto)
 COPY kea/kea-dhcp4.conf.template /kea-dhcp4.conf.template
+COPY nftables/ruleset.nft /etc/nftables/ruleset.nft
 COPY docker/gateway/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
 EXPOSE 8080
-
 ENTRYPOINT ["/entrypoint.sh"]
