@@ -1,37 +1,54 @@
 version: '3.8'
+
 services:
-  gateway:
+  gw:
     build: ./docker/gateway
     container_name: gateway
-    cap_add:
-      - NET_ADMIN
-      - NET_RAW
-      - SYS_MODULE   # se necessário para carregar módulos, mas geralmente nftables já está no kernel
-    sysctls:
-      - net.ipv4.ip_forward=1
+    privileged: true                 # necessário para manipular redes e nftables
+    environment:
+      - GATEWAY_LAN_IP=${GATEWAY_LAN_IP:-192.168.100.1}
+      - DHCP_POOL_START=${DHCP_POOL_START:-192.168.100.100}
+      - DHCP_POOL_END=${DHCP_POOL_END:-192.168.100.200}
+      - DHCP_DNS_SERVERS=${DHCP_DNS_SERVERS:-8.8.8.8, 1.1.1.1}
+      - ADMIN_API_PORT=${ADMIN_API_PORT:-8080}
+      - ADMIN_USER=${ADMIN_USER:-admin}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-lab123}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
     ports:
-      - "8080:8080"
+      - "${ADMIN_API_PORT:-8080}:8080"
     networks:
-      wan:
+      wan:                          # rede externa (com acesso à Internet)
       lan:
-        ipv4_address: 192.168.100.1
+        ipv4_address: ${GATEWAY_LAN_IP:-192.168.100.1}
+    restart: unless-stopped
 
-  cliente1:
+  client1:
     build: ./docker/client
-    container_name: cliente1
+    container_name: client1
     networks:
-      lan:
+      - lan
     depends_on:
-      - gateway
+      - gw
+    restart: unless-stopped
 
-  # cliente2, etc.
+  client2:
+    build: ./docker/client
+    container_name: client2
+    networks:
+      - lan
+    depends_on:
+      - gw
+    restart: unless-stopped
 
 networks:
   wan:
     driver: bridge
+    # Nome explícito para facilitar testes manuais
+    name: lab_wan
   lan:
     driver: bridge
-    internal: true
+    internal: true                  # isola completamente a LAN
     ipam:
       config:
-        - subnet: 192.168.100.0/24
+        - subnet: ${LAN_SUBNET:-192.168.100.0/24}
+    name: lab_lan
