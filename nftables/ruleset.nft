@@ -2,9 +2,46 @@
 
 flush ruleset
 
+# ─── NAT (masquerade para acesso à Internet) ──────────────────────
 table inet nat {
     chain postrouting {
         type nat hook postrouting priority srcnat; policy accept;
         oifname "eth0" masquerade
+    }
+}
+
+# ─── Firewall stateful ───────────────────────────────────────────
+table inet filter {
+    # Proteção do próprio gateway
+    chain input {
+        type filter hook input priority filter; policy drop;
+
+        # Tráfego de loopback sempre permitido
+        iif "lo" accept
+
+        # Conexões já estabelecidas ou relacionadas (ex.: resposta da API)
+        ct state established,related accept
+
+        # Aceitar todo tráfego vindo da LAN (DHCP, futuras consultas DNS locais etc.)
+        iifname "eth1" accept
+
+        # Expor apenas a porta 8080 (API) na interface WAN
+        iifname "eth0" tcp dport 8080 accept
+
+        # Opcional: log de pacotes descartados (comente em produção)
+        # log prefix "INPUT DROP: " drop
+    }
+
+    # Controle de tráfego entre interfaces
+    chain forward {
+        type filter hook forward priority filter; policy drop;
+
+        # Permitir tráfego de retorno de conexões já iniciadas
+        ct state established,related accept
+
+        # Permitir que hosts da LAN iniciem novas conexões para a WAN
+        iifname "eth1" oifname "eth0" accept
+
+        # Nenhum tráfego novo da WAN para a LAN é permitido (pinholes futuros virão pela API)
     }
 }
