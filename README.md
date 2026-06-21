@@ -118,7 +118,7 @@ Visão geral
 O objetivo é simular um pequeno escritório ou laboratório de redes onde uma máquina atua como gateway entre uma rede interna isolada (LAN) e a rede externa (WAN/Internet). Todos os componentes são empacotados em contêineres Docker para garantir reprodutibilidade.
 
 Diagrama de topologia
-text
+```text
                   Internet / Rede do Host
                          │
                   ┌──────▼───────┐
@@ -134,9 +134,11 @@ text
                          │ (rede lan, internal)
         ┌────────────────┼────────────────┐
    ┌────▼────┐      ┌────▼────┐
-   │ cliente1 │      │ cliente2 │
-   │ IP DHCP  │      │ IP DHCP  │
+   │ cliente1│      │ cliente2│
+   │ IP DHCP │      │ IP DHCP │
    └─────────┘      └─────────┘
+```
+
 Rede WAN (wan): bridge Docker normal, com acesso externo. O gateway obtém um endereço nessa rede (via DHCP do Docker).
 
 Rede LAN (lan): bridge Docker com internal: true. Nenhum tráfego externo pode entrar ou sair dessa rede sem passar pelo gateway.
