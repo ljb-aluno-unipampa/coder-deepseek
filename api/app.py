@@ -36,6 +36,7 @@ def requires_auth(f):
 
 # ─── Endpoints ────────────────────────────────────────────────────
 
+
 @app.route('/api/status')
 def status():
     """Informações básicas do gateway."""

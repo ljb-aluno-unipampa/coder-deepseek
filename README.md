@@ -241,6 +241,7 @@ Substituir o servidor DHCP (Kea) por outra solução, alterando apenas o templat
 
 Expandir a API com novos endpoints (ex.: estatísticas de tráfego, configuração de DNS, etc.).
 
+
 ---
 
 **Como usar:**
