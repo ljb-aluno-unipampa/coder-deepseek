@@ -1,248 +1,388 @@
-# Laboratório de Gateway Dockerizado
+# Laboratorio de Gateway Dockerizado
 
-Laboratório reprodutível para disciplina de mestrado que simula um ambiente de rede com um **gateway** contendo:
+Artefato reprodutivel para simular uma rede local isolada com um gateway Linux
+dockerizado. O gateway executa DHCPv4 com Kea, NAT/firewall stateful com
+nftables e uma API administrativa em Flask para observacao e alteracao
+temporaria de regras.
 
-- Servidor DHCPv4 (**Kea**)
-- NAT / Firewall stateful (**nftables**)
-- API administrativa e interface web (**Python/Flask**)
+Artigo associado: o titulo formal e o resumo do artigo nao estao incluidos no
+repositorio. Para fins de avaliacao do artefato, este README documenta a
+reivindicacao tecnica implementada: e possivel reproduzir, em uma unica maquina
+com Docker, uma topologia LAN/WAN na qual clientes recebem endereco via DHCP,
+saem para a Internet apenas pelo gateway e podem ser observados por uma API web.
 
-Todo o sistema é executado em contêineres **Docker** com **Ubuntu 24.04**, proporcionando isolamento real entre a rede LAN (totalmente interna) e a rede WAN (externa).
+## Estrutura do README.md
 
-## 🧱 Arquitetura
+Este documento esta organizado da seguinte forma:
 
-Consulte o [documento detalhado de arquitetura](docs/arquitetura.md).
+- `Informacoes basicas`: ambiente necessario para executar e replicar os testes.
+- `Dependencias`: softwares, imagens, pacotes e recursos externos utilizados.
+- `Preocupacoes com seguranca`: riscos e cuidados recomendados.
+- `Instalacao`: passos para obter, configurar e iniciar o artefato.
+- `Teste minimo`: validacao rapida de funcionamento.
+- `Experimentos`: passos para reproduzir as principais reivindicacoes.
+- `LICENSE`: licenca do projeto.
 
-**Resumo:**
-- Rede `wan` (bridge, com acesso à Internet)
-- Rede `lan` (bridge, `internal: true` – completamente isolada)
-- Contêiner `gateway` com duas interfaces:  
-  `eth0` na WAN, `eth1` na LAN (IP fixo `192.168.100.1`).
-- Contêineres `client1` e `client2` conectados apenas à LAN, obtendo IP via DHCP do gateway.
-- O gateway aplica NAT (masquerade) para que os clientes acessem a Internet, e firewall stateful que protege a LAN e expõe apenas a API (porta 8080).
+## Estrutura do repositorio
 
-## ⚙️ Pré‑requisitos
-
-- Docker (versão 20.10 ou superior)
-- Docker Compose (versão 2.x ou superior)
-- Git (para clonar o repositório)
-
-## 🚀 Como usar
-
-1. Clone o repositório e acesse o diretório:
-
-   ```bash
-   git clone <url-do-repo> lab-gateway-docker
-   cd lab-gateway-docker
-   ```
-2. Copie o arquivo de variáveis de ambiente e ajuste se desejar:
-   `cp .env.example .env`
-
-3. Construa e suba os contêineres:
-    `docker-compose up -d`
-
-4. Verifique os logs do gateway:
-    `docker logs gateway`
-
-5. Acesse a interface web administrativa:
-    Abra http://localhost:8080 no navegador.
-
-6. Teste a conectividade a partir de um cliente LAN:
-    ```bash
-    docker exec client1 ping -c 3 8.8.8.8
-    docker exec client1 curl -s ifconfig.me
-    ```
-
-## 🔧 Configuração
-As principais variáveis estão em .env (veja .env.example):
-
-```txt
-Variável	Descrição	Padrão
-LAN_SUBNET	Sub-rede da LAN	192.168.100.0/24
-GATEWAY_LAN_IP	IP do gateway na LAN	192.168.100.1
-DHCP_POOL_START	Início do pool DHCP	192.168.100.100
-DHCP_POOL_END	Fim do pool DHCP	192.168.100.200
-DHCP_DNS_SERVERS	Servidores DNS (separados por vírgula)	8.8.8.8, 1.1.1.1
-ADMIN_API_PORT	Porta exposta da API (host)	8080
-ADMIN_USER	Usuário para a API	admin
-ADMIN_PASSWORD	Senha para a API	lab123
-LOG_LEVEL	Nível de log (não implementado)	DEBUG
-```
-
-## 🧪 Testes manuais
-DHCP: os clientes devem obter IP automaticamente na faixa definida.
-
-NAT: clientes alcançam a Internet (ping, curl). O IP público visto será o do gateway (ou da rede Docker).
-
-Firewall: a partir do host, tente acessar um IP da LAN (ex.: 192.168.100.100) – deve falhar.
-
-API: endpoints públicos (/api/status, /api/leases, /api/firewall/rules) não exigem autenticação. Endpoints de escrita (POST, DELETE) requerem autenticação HTTP Basic (usuário/senha definidos).
-
-## 📂 Estrutura do projeto
-
-```txt
-lab-gateway-docker/
-├── .env.example
-├── docker-compose.yml
-├── docker/
-│   ├── gateway/
-│   │   ├── Dockerfile
-│   │   └── entrypoint.sh
-│   └── client/
-│       ├── Dockerfile
-│       └── entrypoint.sh
-├── kea/
-│   └── kea-dhcp4.conf.template
-├── nftables/
-│   └── ruleset.nft
+```text
+coder-deepseek/
 ├── api/
-│   ├── app.py
-│   ├── templates/
-│   │   └── index.html
-│   └── static/
-│       └── css/style.css
-├── docs/
-│   └── arquitetura.md
+│   ├── app.py                      # API Flask e painel web
+│   ├── static/css/style.css
+│   └── templates/index.html
+├── docker/
+│   ├── client/
+│   │   ├── Dockerfile              # Imagem dos clientes LAN
+│   │   └── entrypoint.sh           # Solicita IP via DHCP e mantem o container vivo
+│   └── gateway/
+│       ├── Dockerfile              # Imagem do gateway
+│       ├── entrypoint.sh           # Inicializa rede, nftables, Kea e API
+│       └── requirements.txt
+├── docs/arquitetura.md             # Nota de arquitetura
+├── kea/
+│   ├── kea-dhcp4.conf              # Exemplo de configuracao gerada
+│   └── kea-dhcp4.conf.template     # Template usado no startup
+├── nftables/ruleset.nft            # Regras base de NAT/firewall
+├── scripts/test_connectivity.sh    # Reservado para testes auxiliares
+├── docker-compose.yml              # Topologia experimental
+├── env.example                     # Variaveis de ambiente opcionais
+├── LICENSE
 └── README.md
 ```
 
-## ⚠️ Riscos de segurança
+## Informacoes basicas
 
-Este é um ambiente de laboratório; em produção, considere:
+O ambiente cria tres containers:
 
-Privilégios: O gateway roda em modo privileged por conveniência. Em um cenário real, utilize capabilities estritas (NET_ADMIN, NET_RAW).
+- `gateway`: conectado a rede `wan` (`eth0`) e a rede `lan` (`eth1`). Usa o IP
+  `192.168.100.1/24` na LAN, habilita encaminhamento IPv4, aplica NAT/firewall,
+  executa Kea DHCPv4 e expoe a API administrativa na porta `8080`.
+- `client1` e `client2`: conectados apenas a rede `lan`. O endereco inicial
+  atribuido pelo Docker e removido no startup, e o endereco operacional e obtido
+  via DHCP do gateway.
 
-Autenticação: As credenciais da API são passadas via variáveis de ambiente e transmitidas em texto plano (HTTP Basic). Use HTTPS e mecanismos de sessão robustos em produção.
+Topologia:
 
-Exposição: Apenas a porta 8080 é exposta no host. O firewall interno restringe acessos à LAN.
-
-Persistência: As regras de firewall adicionadas via API são voláteis (somem ao reiniciar). Para persistência, seria necessário modificar o ruleset base.
-
-Arquitetura do Laboratório de Gateway Dockerizado
-Visão geral
-O objetivo é simular um pequeno escritório ou laboratório de redes onde uma máquina atua como gateway entre uma rede interna isolada (LAN) e a rede externa (WAN/Internet). Todos os componentes são empacotados em contêineres Docker para garantir reprodutibilidade.
-
-Diagrama de topologia
 ```text
-                  Internet / Rede do Host
-                         │
-                  ┌──────▼───────┐
-                  │   gateway    │
-                  │ eth0 (WAN)   │  ← IP dinâmico (rede wan)
-                  │              │
-                  │ eth1 (LAN)   │  ← 192.168.100.1/24
-                  │              │
-                  │ - Kea DHCP   │
-                  │ - nftables   │
-                  │ - Flask API  │
-                  └──────┬───────┘
-                         │ (rede lan, internal)
-        ┌────────────────┼────────────────┐
-   ┌────▼────┐      ┌────▼────┐
-   │ cliente1│      │ cliente2│
-   │ IP DHCP │      │ IP DHCP │
-   └─────────┘      └─────────┘
+Internet / host Docker
+        |
+      wan
+        |
+  eth0 gateway eth1 (192.168.100.1)
+        |
+      lan internal
+        |
+   client1, client2
 ```
 
-Rede WAN (wan): bridge Docker normal, com acesso externo. O gateway obtém um endereço nessa rede (via DHCP do Docker).
+Requisitos de software no host:
 
-Rede LAN (lan): bridge Docker com internal: true. Nenhum tráfego externo pode entrar ou sair dessa rede sem passar pelo gateway.
+- Linux recomendado para melhor compatibilidade com recursos de rede do Docker.
+- Docker Engine 20.10 ou superior.
+- Docker Compose v2 ou superior (`docker compose ...`).
+- Git.
+- Acesso a Internet durante o build para baixar imagens e pacotes Ubuntu.
 
-Gateway: contêiner com duas interfaces virtuais (eth0 e eth1). Executa os serviços críticos: servidor DHCP, NAT/firewall e API administrativa.
+Requisitos de hardware estimados:
 
-Clientes: contêineres Ubuntu 24.04 conectados exclusivamente à LAN. Não possuem nenhuma configuração de rede manual; dependem do DHCP para obter IP, rota padrão e servidores DNS.
+- CPU: 2 vCPUs ou mais.
+- Memoria: 1 GB livre para execucao; 2 GB recomendados durante o build.
+- Disco: 2 GB livres para imagens, camadas e cache.
+- Rede: acesso externo para baixar dependencias e testar NAT.
 
+## Dependencias
 
-## Componentes internos do gateway
-### 1. Kea DHCPv4
-Arquivo de configuração gerado a partir do template kea-dhcp4.conf.template usando envsubst.
+O artefato nao depende de benchmark externo. A validacao e feita por comandos de
+rede executados nos containers.
 
-Atende apenas na interface eth1.
+Dependencias principais:
 
-Distribui endereços do pool definido (DHCP_POOL_START a DHCP_POOL_END), além de informar roteador padrão (192.168.100.1) e servidores DNS.
+- Imagem base: `ubuntu:24.04`.
+- Gateway:
+  - `kea-dhcp4-server` para DHCPv4.
+  - `nftables` para NAT e firewall.
+  - `python3-flask` para API e interface web.
+  - `iproute2`, `curl`, `jq`, `dnsutils`, `gettext-base`.
+- Clientes:
+  - `isc-dhcp-client` para solicitar lease DHCP.
+  - `iproute2` para inspecao/configuracao de rede.
+  - `iputils-ping`, `curl`, `jq`, `dnsutils` para testes.
 
-As concessões são armazenadas no arquivo CSV /var/lib/kea/kea-leases4.csv.
+As versoes exatas dos pacotes sao resolvidas pelos repositorios do Ubuntu 24.04
+no momento do build. Em uma execucao validada, o Kea reportou versao `2.4.1`.
 
-### 2. nftables (NAT + Firewall)
-O arquivo nftables/ruleset.nft contém duas tabelas:
+Variaveis configuraveis em `.env`:
 
-Tabela inet nat: cadeia postrouting com regra de masquerade para todo tráfego saindo pela eth0. Isso permite que os clientes da LAN acessem a Internet com o IP do gateway.
+```text
+LAN_SUBNET=192.168.100.0/24
+LAN_DOCKER_GATEWAY=192.168.100.254
+GATEWAY_LAN_IP=192.168.100.1
+DHCP_POOL_START=192.168.100.100
+DHCP_POOL_END=192.168.100.200
+DHCP_DNS_SERVERS=8.8.8.8, 1.1.1.1
+ADMIN_API_PORT=8080
+ADMIN_USER=admin
+ADMIN_PASSWORD=lab123
+LOG_LEVEL=DEBUG
+```
 
-Tabela inet filter:
+## Preocupacoes com seguranca
 
-Cadeia input (proteção local): política drop. Aceita tráfego de loopback, conexões já estabelecidas, todo tráfego vindo da eth1 (LAN) e apenas a porta 8080 (API) na interface eth0 (WAN).
+Este artefato deve ser executado em ambiente de laboratorio, preferencialmente
+em uma VM ou maquina descartavel.
 
-Cadeia forward (roteamento): política drop. Aceita pacotes de retorno de conexões estabelecidas e novas conexões iniciadas da LAN (eth1) para a WAN (eth0). Nenhuma conexão iniciada da WAN para a LAN é permitida, a menos que regras adicionais sejam inseridas via API.
+Riscos e mitigacoes:
 
-O encaminhamento IP é ativado com sysctl net.ipv4.ip_forward=1 no script de inicialização.
+- O container `gateway` usa `privileged: true` para manipular interfaces,
+  encaminhamento IPv4 e nftables. Nao execute em hosts de producao.
+- A regra `flush ruleset` existe dentro do arquivo nftables aplicado no
+  namespace de rede do container. Ainda assim, por usar modo privilegiado,
+  recomenda-se isolar a avaliacao em uma maquina sem regras criticas no host.
+- A API expoe a porta `8080` no host. Endpoints de leitura sao publicos; apenas
+  escrita exige HTTP Basic.
+- As credenciais padrao (`admin`/`lab123`) sao fracas e trafegam por HTTP sem
+  TLS. Altere `ADMIN_USER` e `ADMIN_PASSWORD` em `.env` se a porta ficar
+  acessivel a terceiros.
+- As regras adicionadas pela API sao temporarias e desaparecem ao recriar o
+  container.
 
-### 3. API Administrativa (Flask)
-Aplicação Python servida pelo Flask na porta 8080. Fornece endpoints para monitoramento e controle:
+Para encerrar e remover os recursos criados:
 
-GET /api/status – uptime e informações das interfaces de rede.
+```bash
+docker compose down --remove-orphans
+```
 
-GET /api/leases – lista de concessões DHCP ativas (leitura do CSV do Kea).
+## Instalacao
 
-GET /api/firewall/rules – regras atuais da cadeia forward (tabela filter).
+1. Clone o repositorio e entre no diretorio:
 
-POST /api/firewall/rule – adiciona uma regra temporária na cadeia forward (requer autenticação Basic).
+   ```bash
+   git clone <url-do-repositorio> coder-deepseek
+   cd coder-deepseek
+   ```
 
-DELETE /api/firewall/rule/<handle> – remove uma regra pelo seu identificador (handle).
+2. Crie o arquivo `.env` a partir do exemplo:
 
-/ – painel web que consome os endpoints acima e oferece formulários para administração.
+   ```bash
+   cp env.example .env
+   ```
 
-A autenticação é feita por HTTP Basic, com credenciais definidas pelas variáveis ADMIN_USER e ADMIN_PASSWORD.
+3. Opcionalmente edite `.env` para alterar sub-rede, pool DHCP, porta da API ou
+   credenciais administrativas.
 
-### 4. Interface Web
-O painel (/) é uma página HTML com Bootstrap 5 e JavaScript puro. Ele:
+4. Construa e inicie o ambiente:
 
-Exibe o status do gateway (uptime, IPs das interfaces).
+   ```bash
+   docker compose up --build -d
+   ```
 
-Lista as concessões DHCP ativas.
+5. Verifique se os containers estao ativos:
 
-Mostra as regras do firewall e permite adicionar/remover regras mediante autenticação.
+   ```bash
+   docker compose ps
+   ```
 
-#### Fluxo de inicialização
-O script entrypoint.sh do gateway segue a seguinte ordem:
+Ao final da instalacao, a interface web/API deve estar disponivel em
+`http://localhost:8080`.
 
-Configura a interface eth1 com o IP estático 192.168.100.1/24.
+## Teste minimo
 
-Habilita o encaminhamento de pacotes IPv4.
+O teste minimo valida se a aplicacao subiu, se o DHCP funcionou e se um cliente
+consegue sair para a Internet via gateway. Tempo esperado: menos de 2 minutos
+apos o build inicial.
 
-Aplica o ruleset do nftables.
+1. Verifique o estado dos containers:
 
-Gera a configuração do Kea a partir do template e variáveis de ambiente.
+   ```bash
+   docker compose ps
+   ```
 
-Inicia o servidor Kea em segundo plano.
+   Resultado esperado: `gateway`, `client1` e `client2` com status `Up`.
 
-Inicia a API Flask em segundo plano.
+2. Consulte a API:
 
-Mantém o contêiner vivo com tail -f /dev/null.
+   ```bash
+   curl -fsS http://localhost:8080/api/status | jq -r '.status'
+   ```
 
-#### Isolamento da LAN
-A rede lan é definida no docker-compose.yml com internal: true. Essa configuração faz com que o Docker:
+   Resultado esperado:
 
-Impeça que contêineres nessa rede recebam qualquer conectividade externa (a não ser via outro contêiner com interface também nessa rede).
+   ```text
+   running
+   ```
 
-O gateway, por estar conectado às duas redes, age como o único ponto de saída. O firewall reforça esse isolamento.
+3. Verifique o endereco DHCP do `client1`:
 
-#### Segurança
-Apenas a porta 8080 do gateway é mapeada para o host. O acesso ao Kea (porta 67/UDP) e demais serviços ficam restritos às redes internas.
+   ```bash
+   docker exec client1 ip -4 addr show eth0
+   docker exec client1 ip route show
+   ```
 
-O nftables protege o próprio gateway com política input drop, reduzindo a superfície de ataque.
+   Resultado esperado: endereco dinamico na faixa `192.168.100.100-200` e rota
+   padrao `default via 192.168.100.1`.
 
-A API exige autenticação para operações de modificação, mas endpoints de leitura são públicos para facilitar o monitoramento didático.
+4. Teste conectividade externa:
 
-O uso de privileged: true no contêiner gateway é uma concessão para simplificar a manipulação de interfaces e regras de firewall. Em um ambiente de produção, deve‑se usar capabilities seletivas e namespaces de rede mais restritos.
+   ```bash
+   docker exec client1 ping -c 2 8.8.8.8
+   docker exec client1 curl -fsS --max-time 10 http://example.com | head -n 1
+   ```
 
-As regras de firewall adicionadas via API são efêmeras; não sobrevivem à reinicialização do contêiner.
+   Resultado esperado: `0% packet loss` no ping e retorno HTML do
+   `example.com`.
 
-#### Extensibilidade
-A arquitetura permite:
+## Experimentos
 
-Adicionar mais clientes LAN simplesmente replicando o serviço no docker-compose.yml.
+Os experimentos abaixo reproduzem as principais reivindicacoes tecnicas do
+artefato. Cada experimento pressupoe que a instalacao ja foi concluida.
 
-Incluir regras de firewall persistentes editando o ruleset.nft antes da construção.
+### Reivindicacao #1: clientes LAN recebem configuracao via DHCP
 
-Substituir o servidor DHCP (Kea) por outra solução, alterando apenas o template e a instalação no Dockerfile.
+Objetivo: demonstrar que os clientes nao dependem de configuracao manual e
+recebem IP, rota e DNS a partir do gateway Kea.
 
-Expandir a API com novos endpoints (ex.: estatísticas de tráfego, configuração de DNS, etc.).
+Arquivos relevantes:
+
+- `kea/kea-dhcp4.conf.template`
+- `docker/client/entrypoint.sh`
+- `.env`
+
+Comandos:
+
+```bash
+docker logs gateway | grep DHCP4_LEASE_ALLOC
+docker exec client1 ip -4 addr show eth0
+docker exec client2 ip -4 addr show eth0
+docker exec client1 ip route show
+```
+
+Tempo esperado: menos de 30 segundos depois dos containers iniciarem.
+
+Recursos esperados: menos de 1 GB de RAM e baixo uso de CPU.
+
+Resultado esperado:
+
+- Logs do gateway contendo eventos `DHCP4_LEASE_ALLOC`.
+- `client1` e `client2` com enderecos dinamicos dentro do pool DHCP.
+- Rota padrao dos clientes apontando para `192.168.100.1`.
+
+Para alterar o experimento, edite `.env`:
+
+```text
+DHCP_POOL_START=192.168.100.120
+DHCP_POOL_END=192.168.100.130
+```
+
+Depois recrie:
+
+```bash
+docker compose down --remove-orphans
+docker compose up --build -d
+```
+
+### Reivindicacao #2: a LAN isolada acessa a Internet apenas via gateway
+
+Objetivo: demonstrar que a rede `lan` e `internal: true`, e que a saida externa
+dos clientes ocorre por encaminhamento IPv4 e NAT no gateway.
+
+Arquivos relevantes:
+
+- `docker-compose.yml`
+- `nftables/ruleset.nft`
+- `docker/gateway/entrypoint.sh`
+
+Comandos:
+
+```bash
+docker exec gateway sysctl net.ipv4.ip_forward
+docker exec gateway nft list ruleset
+docker exec client1 ip route show
+docker exec client1 ping -c 2 8.8.8.8
+docker exec client1 curl -fsS --max-time 10 http://example.com | head -n 1
+```
+
+Tempo esperado: menos de 1 minuto.
+
+Recursos esperados: menos de 1 GB de RAM; trafego de rede minimo.
+
+Resultado esperado:
+
+- `net.ipv4.ip_forward = 1`.
+- Ruleset com `oifname "eth0" masquerade`.
+- Rota padrao do cliente via `192.168.100.1`.
+- Ping externo com `0% packet loss`.
+- Requisicao HTTP externa bem-sucedida.
+
+### Reivindicacao #3: o firewall stateful bloqueia encaminhamento nao permitido
+
+Objetivo: demonstrar que o firewall aceita conexoes LAN -> WAN e respostas
+estabelecidas, mas nao libera novos fluxos WAN -> LAN por padrao.
+
+Arquivos relevantes:
+
+- `nftables/ruleset.nft`
+- `api/app.py`
+
+Comandos:
+
+```bash
+docker exec gateway nft list chain inet filter forward
+docker exec gateway nft list chain inet filter input
+curl -fsS http://localhost:8080/api/firewall/rules | jq .
+```
+
+Tempo esperado: menos de 30 segundos.
+
+Recursos esperados: uso irrelevante de CPU/RAM.
+
+Resultado esperado:
+
+- Cadeia `forward` com politica `drop`.
+- Regra permitindo `ct state established,related`.
+- Regra permitindo `iifname "eth1" oifname "eth0" accept`.
+- Nenhuma regra padrao permitindo novas conexoes da WAN para a LAN.
+
+### Reivindicacao #4: a API administrativa permite observacao do gateway
+
+Objetivo: demonstrar que o artefato expoe estado operacional por HTTP e
+consulta leases DHCP gravados pelo Kea.
+
+Arquivos relevantes:
+
+- `api/app.py`
+- `api/templates/index.html`
+
+Comandos:
+
+```bash
+curl -fsS http://localhost:8080/api/status | jq '.status, .uptime_seconds'
+curl -fsS http://localhost:8080/api/leases | jq .
+curl -fsS http://localhost:8080/api/firewall/rules | jq .
+```
+
+Tempo esperado: menos de 30 segundos.
+
+Recursos esperados: uso irrelevante de CPU/RAM.
+
+Resultado esperado:
+
+- `/api/status` retorna `running`, uptime e interfaces.
+- `/api/leases` retorna uma lista de leases, apos os clientes obterem DHCP.
+- `/api/firewall/rules` retorna a representacao JSON das regras nftables.
+
+Operacoes de escrita exigem autenticacao Basic. Exemplo de chamada autenticada:
+
+```bash
+curl -u admin:lab123 -X POST http://localhost:8080/api/firewall/rule \
+  -H 'Content-Type: application/json' \
+  -d '{"expression":"ip saddr 192.168.100.100 accept"}'
+```
+
+Observacao: regras adicionadas por esse endpoint sao temporarias e devem ser
+removidas manualmente ou descartadas recriando o ambiente.
+
+## LICENSE
+
+Este projeto esta licenciado sob a licenca BSD 3-Clause. Consulte o arquivo
+`LICENSE` para o texto completo.

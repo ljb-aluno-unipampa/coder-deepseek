@@ -1,8 +1,8 @@
-version: '3.8'
-
 services:
   gw:
-    build: ./docker/gateway
+    build:
+      context: .
+      dockerfile: docker/gateway/Dockerfile
     container_name: gateway
     privileged: true                 # necessário para manipular redes e nftables
     environment:
@@ -18,13 +18,18 @@ services:
       - "${ADMIN_API_PORT:-8080}:8080"
     networks:
       wan:                          # rede externa (com acesso à Internet)
+        interface_name: eth0
       lan:
+        interface_name: eth1
         ipv4_address: ${GATEWAY_LAN_IP:-192.168.100.1}
     restart: unless-stopped
 
   client1:
     build: ./docker/client
     container_name: client1
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
     networks:
       - lan
     depends_on:
@@ -35,6 +40,9 @@ services:
   client2:
     build: ./docker/client
     container_name: client2
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
     networks:
       - lan
     depends_on:
@@ -52,4 +60,5 @@ networks:
     ipam:
       config:
         - subnet: ${LAN_SUBNET:-192.168.100.0/24}
+          gateway: ${LAN_DOCKER_GATEWAY:-192.168.100.254}
     name: lab_lan

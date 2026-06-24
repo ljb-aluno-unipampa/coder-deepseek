@@ -4,6 +4,7 @@ import json
 import csv
 import io
 import os
+import shlex
 from functools import wraps
 from flask import Flask, request, jsonify, Response, render_template
 
@@ -13,6 +14,22 @@ app = Flask(__name__)
 ADMIN_USER = os.environ.get("ADMIN_USER", "admin")
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "lab123")
 LEASES_FILE = "/var/lib/kea/kea-leases4.csv"
+
+def list_forward_rules():
+    result = subprocess.run(
+        ['nft', '-a', '-j', 'list', 'chain', 'inet', 'filter', 'forward'],
+        capture_output=True, text=True, check=True
+    )
+    data = json.loads(result.stdout)
+    rules = []
+    for item in data.get('nftables', []):
+        rule = item.get('rule')
+        if rule and rule.get('chain') == 'forward':
+            rules.append({
+                'handle': rule.get('handle'),
+                'expr': json.dumps(rule.get('expr', []), ensure_ascii=False)
+            })
+    return rules
 
 # ─── Autenticação ─────────────────────────────────────────────────
 def check_auth(username, password):
@@ -71,23 +88,9 @@ def leases():
 def firewall_rules():
     """Regras atuais da tabela filter (cadeia forward)."""
     try:
-        result = subprocess.run(
-            ['nft', '-j', 'list', 'table', 'inet', 'filter'],
-            capture_output=True, text=True, check=True
-        )
-        data = json.loads(result.stdout)
-        # Extrai apenas a cadeia forward (se existir)
-        table = data.get('nftables', [])
-        forward_rules = []
-        for item in table:
-            if 'chain' in item and item['chain'].get('name') == 'forward':
-                # O chain contém uma lista 'rules'? Na verdade, a estrutura:
-                # {"chain": {"name": "forward", ..., "rules": [...]}}
-                forward_rules = item['chain'].get('rules', [])
-                break
-        return jsonify(forward_rules)
+        return jsonify(list_forward_rules())
     except subprocess.CalledProcessError as e:
-        return jsonify({'error': 'Falha ao listar regras', 'detail': str(e)}), 500
+        return jsonify({'error': 'Falha ao listar regras', 'detail': e.stderr.strip()}), 500
 
 @app.route('/api/firewall/rule', methods=['POST'])
 @requires_auth
@@ -104,21 +107,20 @@ def add_firewall_rule():
     # Para segurança, restringir operações à tabela inet filter
     if table != 'inet filter':
         return jsonify({'error': 'Apenas a tabela "inet filter" é permitida'}), 400
-    if chain not in ('forward', 'input', 'output'):  # permite outras, mas com cautela
-        return jsonify({'error': 'Cadeia não permitida'}), 400
+    if chain != 'forward':
+        return jsonify({'error': 'Apenas a cadeia "forward" é permitida'}), 400
 
     # Monta o comando nft em formato seguro (sem shell)
-    # A expressão é separada em argumentos por espaços
-    cmd = ['nft', '-j', 'add', 'rule', table, chain] + expr.split()
+    cmd = ['nft', 'add', 'rule', 'inet', 'filter', chain] + shlex.split(expr)
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
-        output = json.loads(result.stdout)
-        # Extrai o handle da resposta
-        # Exemplo: {"add": {"rule": {"family": "inet", ..., "handle": 42}}}
-        handle = output['add']['rule']['handle']
+        subprocess.run(cmd, capture_output=True, text=True, check=True)
+        rules = list_forward_rules()
+        handle = max((rule['handle'] for rule in rules if rule.get('handle') is not None), default=None)
         return jsonify({'status': 'Regra adicionada', 'handle': handle}), 201
     except subprocess.CalledProcessError as e:
         return jsonify({'error': 'Erro ao adicionar regra', 'detail': e.stderr.strip()}), 400
+    except ValueError as e:
+        return jsonify({'error': 'Expressão inválida', 'detail': str(e)}), 400
 
 @app.route('/api/firewall/rule/<int:handle>', methods=['DELETE'])
 @requires_auth

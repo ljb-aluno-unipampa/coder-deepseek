@@ -17,6 +17,7 @@ echo "==> Aplicando regras nftables (NAT + Firewall)"
 nft -f /etc/nftables/ruleset.nft
 
 echo "==> Gerando configuração do Kea a partir do template"
+mkdir -p /run/kea /var/run/kea /var/lib/kea
 envsubst < /kea-dhcp4.conf.template > /etc/kea/kea-dhcp4.conf
 
 echo "==> Iniciando Kea DHCP Server em background"
