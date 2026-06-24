@@ -55,6 +55,7 @@ Consulte o [documento detalhado de arquitetura](docs/arquitetura.md).
 ## 🔧 Configuração
 As principais variáveis estão em .env (veja .env.example):
 
+```txt
 Variável	Descrição	Padrão
 LAN_SUBNET	Sub-rede da LAN	192.168.100.0/24
 GATEWAY_LAN_IP	IP do gateway na LAN	192.168.100.1
@@ -65,6 +66,7 @@ ADMIN_API_PORT	Porta exposta da API (host)	8080
 ADMIN_USER	Usuário para a API	admin
 ADMIN_PASSWORD	Senha para a API	lab123
 LOG_LEVEL	Nível de log (não implementado)	DEBUG
+```
 
 ## 🧪 Testes manuais
 DHCP: os clientes devem obter IP automaticamente na faixa definida.
@@ -77,6 +79,7 @@ API: endpoints públicos (/api/status, /api/leases, /api/firewall/rules) não ex
 
 ## 📂 Estrutura do projeto
 
+```txt
 lab-gateway-docker/
 ├── .env.example
 ├── docker-compose.yml
@@ -100,6 +103,7 @@ lab-gateway-docker/
 ├── docs/
 │   └── arquitetura.md
 └── README.md
+```
 
 ## ⚠️ Riscos de segurança
 
@@ -242,13 +246,3 @@ Incluir regras de firewall persistentes editando o ruleset.nft antes da constru�
 Substituir o servidor DHCP (Kea) por outra solução, alterando apenas o template e a instalação no Dockerfile.
 
 Expandir a API com novos endpoints (ex.: estatísticas de tráfego, configuração de DNS, etc.).
-
-
----
-
-**Como usar:**
-1. Copie o conteúdo do primeiro bloco e salve como `README.md` na raiz do projeto.
-2. Copie o conteúdo do segundo bloco e salve como `docs/arquitetura.md` (crie a pasta `docs/` se ainda não existir).
-3. Se preferir fazer isso via terminal, você pode usar o comando `cat > arquivo <<EOF ... EOF` para cada um.
-
-Se ainda assim houver problemas de cópia, posso tentar compactar os dois arquivos em um formato diferente, mas acredito que agora esteja direto.

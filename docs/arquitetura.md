@@ -1,32 +1,3 @@
-lab-gateway-docker/
-├── .env.example
-├── docker-compose.yml
-├── docker/
-│   ├── gateway/
-│   │   ├── Dockerfile
-│   │   └── entrypoint.sh
-│   └── client/
-│       ├── Dockerfile
-│       └── entrypoint.sh
-├── kea/
-│   └── kea-dhcp4.conf.template
-├── nftables/
-│   └── ruleset.nft
-├── api/
-│   ├── app.py
-│   ├── templates/
-│   │   └── index.html
-│   └── static/
-│       └── css/style.css
-├── docs/
-│   └── arquitetura.md
-└── README.md
-
----
-
-### `docs/arquitetura.md`
-
-```markdown
 # Arquitetura do Laboratório de Gateway Dockerizado
 
 ## Visão geral
