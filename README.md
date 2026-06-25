@@ -78,18 +78,28 @@ Internet / host Docker
 
 Requisitos de software no host:
 
-- Linux recomendado para melhor compatibilidade com recursos de rede do Docker.
+- Linux Ubuntu 24.04 ou superior, ou distribuicao Linux equivalente com suporte
+  a Docker Engine e redes bridge.
 - Docker Engine 20.10 ou superior.
 - Docker Compose v2 ou superior (`docker compose ...`).
-- Git.
-- Acesso a Internet durante o build para baixar imagens e pacotes Ubuntu.
+- Git para obter o repositorio.
+- Acesso a Internet durante o build para baixar a imagem `ubuntu:24.04` e
+  pacotes dos repositorios Ubuntu.
+- `curl` e `jq` no host sao recomendados para executar os comandos de validacao
+  do README; nao sao necessarios para iniciar os containers.
 
 Requisitos de hardware estimados:
 
-- CPU: 2 vCPUs ou mais.
-- Memoria: 1 GB livre para execucao; 2 GB recomendados durante o build.
-- Disco: 2 GB livres para imagens, camadas e cache.
+- CPU: 2 vCPUs ou mais. A validacao local foi feita em CPU AMD Ryzen 5600X.
+- Memoria: 1 GB livre para execucao; 2 GB recomendados durante o build. O host
+  de desenvolvimento usado como referencia possui 8 GB de RAM.
+- Disco: 2 GB livres para imagens, camadas e cache; SSD recomendado para build
+  e recriacao mais rapidos.
 - Rede: acesso externo para baixar dependencias e testar NAT.
+
+Nao e necessario instalar Kea, nftables, Flask, Python ou pacotes pip
+diretamente no host. Esses componentes sao instalados dentro das imagens Docker
+pelos respectivos `Dockerfile`.
 
 ## Dependencias
 
@@ -108,6 +118,13 @@ Dependencias principais:
   - `isc-dhcp-client` para solicitar lease DHCP.
   - `iproute2` para inspecao/configuracao de rede.
   - `iputils-ping`, `curl`, `jq`, `dnsutils` para testes.
+
+Dependencias Python:
+
+- A API usa Flask instalado pelo pacote Ubuntu `python3-flask`.
+- O arquivo `docker/gateway/requirements.txt` existe no repositorio, mas o
+  build atual nao executa `pip install` a partir dele. Portanto, nao ha
+  requisito de `pip` no host para a execucao via Docker Compose.
 
 As versoes exatas dos pacotes sao resolvidas pelos repositorios do Ubuntu 24.04
 no momento do build. Em uma execucao validada, o Kea reportou versao `2.4.1`.
